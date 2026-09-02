@@ -6,19 +6,17 @@ if (Test-Path $cfgPath) {
     try { $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json } catch {}
 }
 
-# Defaults
-$title    = if ($cfg.title)    { $cfg.title }    else { 'Claude Code' }
-$msgTpl   = if ($cfg.message)  { $cfg.message }  else { "Session '{0}' done!" }
-$sndPath  = if ($cfg.sound)    { $cfg.sound }    else { '' }
-$sndDur   = if ($cfg.soundDuration) { $cfg.soundDuration } else { 3 }
-$locale   = if ($cfg.locale)   { $cfg.locale }   else { 'en' }
+# Defaults (null-check so user can set empty string or 0 intentionally)
+$title    = if ($null -ne $cfg.title)         { $cfg.title }         else { 'Claude Code' }
+$msgTpl   = if ($null -ne $cfg.message)       { $cfg.message }       else { "Session '{0}' done!" }
+$sndPath  = if ($null -ne $cfg.sound)         { $cfg.sound }         else { '' }
+$sndDur   = if ($null -ne $cfg.soundDuration) { $cfg.soundDuration } else { 3 }
+$locale   = if ($null -ne $cfg.locale)        { $cfg.locale }        else { 'en' }
 
-# Locale templates (used only when message is default)
+# Locale templates (applied only when message is the default)
 $localeMsgs = @{
     'en' = "Session '{0}' done!"
     'id' = "Sesi '{0}' selesai!"
-    'ja' = "Session '{0}' done!"
-    'zh' = "Session '{0}' done!"
 }
 if ($msgTpl -eq "Session '{0}' done!" -and $localeMsgs.ContainsKey($locale)) {
     $msgTpl = $localeMsgs[$locale]

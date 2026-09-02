@@ -5,25 +5,52 @@ Shows the **session name**, a **custom message**, and plays a **custom sound** w
 
 Uses modern Windows Toast notifications with a fallback to legacy balloons.
 
-## Quick Setup
+---
+
+## Install
+
+Pick your terminal — all three do the same thing.
+
+### PowerShell
 
 ```powershell
 git clone https://github.com/skadut/claude-code-notification
 cd claude-code-notification
 .\install.ps1
-```
-
-Then edit your config:
-
-```powershell
 notepad "$env:USERPROFILE\.claude\hooks\cc-notif-config.json"
 ```
 
-Done. Notifications fire on every session stop.
+### Git Bash
+
+```bash
+git clone https://github.com/skadut/claude-code-notification
+cd claude-code-notification
+powershell -ExecutionPolicy Bypass -File ./install.ps1
+notepad "$USERPROFILE/.claude/hooks/cc-notif-config.json"
+```
+
+### Windows CMD
+
+```cmd
+git clone https://github.com/skadut/claude-code-notification
+cd claude-code-notification
+powershell -ExecutionPolicy Bypass -File install.ps1
+notepad "%USERPROFILE%\.claude\hooks\cc-notif-config.json"
+```
+
+### What the installer does
+
+1. Copies `notify.ps1` → `~/.claude/hooks/cc-notif.ps1`
+2. Creates `~/.claude/hooks/cc-notif-config.json` from the template (skips if exists)
+3. Appends the Stop hook to `~/.claude/settings.json` (never overwrites existing hooks)
+
+After install, finish any Claude Code session — you'll see a toast notification.
+
+---
 
 ## Config
 
-`~/.claude/hooks/cc-notif-config.json`:
+Edit `~/.claude/hooks/cc-notif-config.json`:
 
 ```json
 {
@@ -49,6 +76,8 @@ Done. Notifications fire on every session stop.
 - [myinstants.com](https://www.myinstants.com/) has a large library of short notification sounds ready to download
 - Supported formats: `.mp3`, `.wav`, `.wma`
 
+---
+
 ## Session Name Resolution
 
 Priority order:
@@ -56,14 +85,40 @@ Priority order:
 2. Project folder name (from session working directory)
 3. First 8 characters of session ID
 
+---
+
 ## Uninstall
+
+### PowerShell
 
 ```powershell
 cd claude-code-notification
 .\uninstall.ps1
 ```
 
+### Git Bash
+
+```bash
+cd claude-code-notification
+powershell -ExecutionPolicy Bypass -File ./uninstall.ps1
+```
+
+### Windows CMD
+
+```cmd
+cd claude-code-notification
+powershell -ExecutionPolicy Bypass -File uninstall.ps1
+```
+
 Removes the hook from `settings.json` and deletes installed files. Other Stop hooks are preserved.
+
+---
+
+## Upgrading
+
+Run the install command again — it updates the hook script and migrates old `.ps1` configs to `.json` automatically.
+
+---
 
 ## How It Works
 
@@ -83,28 +138,36 @@ Claude Code fires a `Stop` hook when a session ends. The installer registers `cc
 | `install.ps1` | One-command installer (appends to existing hooks, never overwrites) |
 | `uninstall.ps1` | Clean removal |
 
+---
+
 ## Manual Install
+
+If you prefer not to run the installer:
 
 1. Copy `notify.ps1` → `~/.claude/hooks/cc-notif.ps1`
 2. Copy `config.example.json` → `~/.claude/hooks/cc-notif-config.json` and edit
-3. Add to `~/.claude/settings.json` under `hooks.Stop`:
+3. Add this entry to the `hooks.Stop` array in `~/.claude/settings.json`:
 
 ```json
 {
-  "hooks": [
-    {
-      "type": "command",
-      "command": "& \"$env:USERPROFILE\\.claude\\hooks\\cc-notif.ps1\"",
-      "shell": "powershell",
-      "async": true
-    }
-  ]
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "& \"$env:USERPROFILE\\.claude\\hooks\\cc-notif.ps1\"",
+            "shell": "powershell",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
 
-## Upgrading
-
-Run `install.ps1` again — it updates the hook script and migrates old `.ps1` configs to `.json` automatically.
+---
 
 ## Requirements
 

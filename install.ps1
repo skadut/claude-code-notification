@@ -20,15 +20,21 @@ $NewConfig = "$HooksDir\cc-notif-config.json"
 if ((Test-Path $OldConfig) -and !(Test-Path $NewConfig)) {
     Write-Host "[!!] Found old .ps1 config — migrating to .json" -ForegroundColor Yellow
     try {
-        . $OldConfig
+        $raw = Get-Content $OldConfig -Raw
+        $extract = { param($varName, $default)
+            if ($raw -match ('\$' + $varName + '\s*=\s*[''"](.+?)[''"]')) { $Matches[1] } else { $default }
+        }
+        $extractNum = { param($varName, $default)
+            if ($raw -match ('\$' + $varName + '\s*=\s*(\d+)')) { [int]$Matches[1] } else { $default }
+        }
         $migrated = @{
-            title         = if ($NotifTitle)   { $NotifTitle }   else { 'Claude Code' }
-            message       = if ($NotifMessage) { $NotifMessage } else { "Session '{0}' done!" }
-            sound         = if ($SoundPath)    { $SoundPath }    else { '' }
-            soundDuration = if ($SoundDuration) { $SoundDuration } else { 3 }
+            title         = & $extract 'NotifTitle'   'Claude Code'
+            message       = & $extract 'NotifMessage' "Session '{0}' done!"
+            sound         = & $extract 'SoundPath'    ''
+            soundDuration = & $extractNum 'SoundDuration' 3
             locale        = 'en'
         }
-        $migrated | ConvertTo-Json | Set-Content $NewConfig -Encoding utf8
+        $migrated | ConvertTo-Json -Depth 5 | Set-Content $NewConfig -Encoding utf8
         Rename-Item $OldConfig "$OldConfig.bak"
         Write-Host "[OK] Migrated config: $NewConfig (old renamed to .bak)" -ForegroundColor Green
     } catch {
