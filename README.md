@@ -76,6 +76,27 @@ Edit `~/.claude/hooks/cc-notif-config.json`:
 - [myinstants.com](https://www.myinstants.com/) has a large library of short notification sounds ready to download
 - Supported formats: `.mp3`, `.wav`, `.wma`
 
+### Interactive config editor
+
+Instead of editing the JSON by hand, run the config script:
+
+**PowerShell:**
+```powershell
+.\config.ps1
+```
+
+**Git Bash:**
+```bash
+powershell -ExecutionPolicy Bypass -File ./config.ps1
+```
+
+**Windows CMD:**
+```cmd
+powershell -ExecutionPolicy Bypass -File config.ps1
+```
+
+It asks for the config path (defaults to `~/.claude/hooks/cc-notif-config.json`), then walks through each setting. Press Enter to keep the current value. Validates sound file paths and formats before saving.
+
 ---
 
 ## Session Name Resolution
@@ -137,6 +158,7 @@ Claude Code fires a `Stop` hook when a session ends. The installer registers `cc
 | `config.example.json` | Config template — installed as `~/.claude/hooks/cc-notif-config.json` |
 | `install.ps1` | One-command installer (appends to existing hooks, never overwrites) |
 | `uninstall.ps1` | Clean removal |
+| `config.ps1` | Interactive config editor |
 
 ---
 
