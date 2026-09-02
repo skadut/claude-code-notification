@@ -1,95 +1,117 @@
 # claude-code-notification
 
-Windows 11 desktop notification hook for Claude Code.  
+Windows 10/11 desktop notification hook for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).  
 Shows the **session name**, a **custom message**, and plays a **custom sound** when a session finishes.
 
-## Setup — 30 seconds
+Uses modern Windows Toast notifications with a fallback to legacy balloons.
+
+## Quick Setup
 
 ```powershell
-# 1. Clone
-git clone https://github.com/YOUR_USERNAME/claude-code-notification
+git clone https://github.com/skadut/claude-code-notification
 cd claude-code-notification
-
-# 2. Install (patches ~/.claude/settings.json automatically)
 .\install.ps1
-
-# 3. Customize
-notepad "$env:USERPROFILE\.claude\hooks\cc-notif-config.ps1"
 ```
 
-That's it. Start any Claude Code session and finish it — notification fires on stop.
+Then edit your config:
+
+```powershell
+notepad "$env:USERPROFILE\.claude\hooks\cc-notif-config.json"
+```
+
+Done. Notifications fire on every session stop.
 
 ## Config
 
-Edit `~/.claude/hooks/cc-notif-config.ps1`:
+`~/.claude/hooks/cc-notif-config.json`:
 
-```powershell
-$NotifTitle   = "Claude Code"
-$NotifMessage = "Session '{0}' done!"   # {0} = session name
-$SoundPath    = "C:\path\to\sound.mp3"  # .mp3 or .wav — leave empty to disable
-$SoundDuration = 3                       # seconds to let it play
+```json
+{
+  "title": "Claude Code",
+  "message": "Session '{0}' done!",
+  "sound": "C:\\path\\to\\sound.mp3",
+  "soundDuration": 3,
+  "locale": "en"
+}
 ```
 
-| Variable | Description |
+| Key | Description |
 |---|---|
-| `$NotifTitle` | Notification header text |
-| `$NotifMessage` | Body text. `{0}` is replaced with the session name. |
-| `$SoundPath` | Full path to `.mp3` or `.wav`. Empty = no sound. |
-| `$SoundDuration` | How many seconds to play before auto-close. |
+| `title` | Notification header |
+| `message` | Body text. `{0}` = session name |
+| `sound` | Path to `.mp3`, `.wav`, or `.wma`. Empty = no sound |
+| `soundDuration` | Fixed playback time in seconds (recommended: 3) |
+| `locale` | Language for default message: `en`, `id` (more welcome via PR) |
 
-## Session name resolution
+### Sound tips
+
+- Keep sounds short — **3 seconds or less** is ideal
+- [myinstants.com](https://www.myinstants.com/) has a large library of short notification sounds ready to download
+- Supported formats: `.mp3`, `.wav`, `.wma`
+
+## Session Name Resolution
 
 Priority order:
 1. Custom title set via `/rename` in Claude Code
-2. Project folder name (from session `cwd`)
-3. First 8 chars of session ID
+2. Project folder name (from session working directory)
+3. First 8 characters of session ID
 
-## How it works
+## Uninstall
 
-Claude Code fires its `Stop` hook when a session ends. `install.ps1` registers `cc-notif.ps1` as that hook in `~/.claude/settings.json`. The script:
+```powershell
+cd claude-code-notification
+.\uninstall.ps1
+```
 
-1. Reads the session ID from stdin (Claude Code passes it as JSON)
+Removes the hook from `settings.json` and deletes installed files. Other Stop hooks are preserved.
+
+## How It Works
+
+Claude Code fires a `Stop` hook when a session ends. The installer registers `cc-notif.ps1` in `~/.claude/settings.json`. On stop, the script:
+
+1. Reads the session ID from stdin (JSON payload from Claude Code)
 2. Resolves the session name from `~/.claude/projects/`
-3. Shows a Windows balloon notification
-4. Plays your sound file via WinMM (no extra installs)
+3. Shows a Windows Toast notification (falls back to balloon on older systems)
+4. Plays your sound file via WinMM
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `notify.ps1` | Hook script — copy of this is installed to `~/.claude/hooks/cc-notif.ps1` |
-| `config.example.ps1` | Config template — copied to `~/.claude/hooks/cc-notif-config.ps1` on first install |
-| `install.ps1` | One-command installer |
+| `notify.ps1` | Hook script — installed as `~/.claude/hooks/cc-notif.ps1` |
+| `config.example.json` | Config template — installed as `~/.claude/hooks/cc-notif-config.json` |
+| `install.ps1` | One-command installer (appends to existing hooks, never overwrites) |
+| `uninstall.ps1` | Clean removal |
 
-## Manual install
-
-If you prefer not to run the installer:
+## Manual Install
 
 1. Copy `notify.ps1` → `~/.claude/hooks/cc-notif.ps1`
-2. Copy `config.example.ps1` → `~/.claude/hooks/cc-notif-config.ps1` and edit it
-3. Add to `~/.claude/settings.json`:
+2. Copy `config.example.json` → `~/.claude/hooks/cc-notif-config.json` and edit
+3. Add to `~/.claude/settings.json` under `hooks.Stop`:
 
 ```json
 {
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "& \"$env:USERPROFILE\\.claude\\hooks\\cc-notif.ps1\"",
-            "shell": "powershell",
-            "async": true
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": [
+    {
+      "type": "command",
+      "command": "& \"$env:USERPROFILE\\.claude\\hooks\\cc-notif.ps1\"",
+      "shell": "powershell",
+      "async": true
+    }
+  ]
 }
 ```
+
+## Upgrading
+
+Run `install.ps1` again — it updates the hook script and migrates old `.ps1` configs to `.json` automatically.
 
 ## Requirements
 
 - Windows 10/11
 - PowerShell 5.1+ (built-in)
 - Claude Code CLI
+
+## License
+
+MIT
