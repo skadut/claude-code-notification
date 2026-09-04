@@ -1,4 +1,7 @@
-# notify.ps1 — Claude Code Stop hook (Windows Toast + custom sound)
+﻿# notify.ps1 — Claude Code notification hook (Windows Toast + custom sound)
+#   -Event Stop          fired when a session finishes
+#   -Event Notification  fired when Claude asks for input / permission
+param([ValidateSet('Stop', 'Notification')][string]$HookEvent = 'Stop')
 
 $cfgPath = "$PSScriptRoot\cc-notif-config.json"
 $cfg = $null
@@ -6,26 +9,34 @@ if (Test-Path $cfgPath) {
     try { $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json } catch {}
 }
 
+$isAsk = $HookEvent -eq 'Notification'
+
 # Defaults (null-check so user can set empty string or 0 intentionally)
 $title    = if ($null -ne $cfg.title)         { $cfg.title }         else { 'Claude Code' }
-$msgTpl   = if ($null -ne $cfg.message)       { $cfg.message }       else { "Session '{0}' done!" }
-$sndPath  = if ($null -ne $cfg.sound)         { $cfg.sound }         else { '' }
 $sndDur   = if ($null -ne $cfg.soundDuration) { $cfg.soundDuration } else { 3 }
 $locale   = if ($null -ne $cfg.locale)        { $cfg.locale }        else { 'en' }
 
-# Locale templates (applied only when message is the default)
+$defaultMsg = if ($isAsk) { "Session '{0}' needs your input" } else { "Session '{0}' done!" }
+$cfgMsg     = if ($isAsk) { $cfg.askMessage } else { $cfg.message }
+$msgTpl     = if ($null -ne $cfgMsg) { $cfgMsg } else { $defaultMsg }
+
+# askSound falls back to sound when unset
+$sndPath = if ($null -ne $cfg.sound) { $cfg.sound } else { '' }
+if ($isAsk -and $cfg.askSound) { $sndPath = $cfg.askSound }
+
+# Locale templates (applied only when message is left at the default)
 $localeMsgs = @{
-    'en' = "Session '{0}' done!"
-    'id' = "Sesi '{0}' selesai!"
+    'en' = @{ Stop = "Session '{0}' done!"; Notification = "Session '{0}' needs your input" }
+    'id' = @{ Stop = "Sesi '{0}' selesai!"; Notification = "Sesi '{0}' butuh input kamu" }
 }
-if ($msgTpl -eq "Session '{0}' done!" -and $localeMsgs.ContainsKey($locale)) {
-    $msgTpl = $localeMsgs[$locale]
+if ($msgTpl -eq $defaultMsg -and $localeMsgs.ContainsKey($locale)) {
+    $msgTpl = $localeMsgs[$locale][$HookEvent]
 }
 
 # Read session payload from stdin
 $raw = [Console]::In.ReadToEnd()
-try { $j = $raw | ConvertFrom-Json; $sid = $j.session_id } catch { $sid = '' }
-
+$hookMsg = ''
+try { $j = $raw | ConvertFrom-Json; $sid = $j.session_id; $hookMsg = [string]$j.message } catch { $sid = '' }
 # Resolve session name: custom title > cwd folder > sid prefix
 $name = ''
 $jf = Get-ChildItem "$env:USERPROFILE\.claude\projects" -Filter "$sid.jsonl" -Recurse -ErrorAction SilentlyContinue |
@@ -49,6 +60,9 @@ if ($jf) {
 if (!$name) { $name = if ($sid) { $sid.Substring(0, [Math]::Min(8, $sid.Length)) } else { 'unknown' } }
 
 $body = $msgTpl -f $name
+
+# Claude's own notification text is more specific than the template — prefer it.
+if ($isAsk -and $hookMsg) { $body = "$name`: $hookMsg" }
 
 # --- Windows Toast notification ---
 try {

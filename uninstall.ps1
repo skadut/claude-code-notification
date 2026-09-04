@@ -1,30 +1,37 @@
-# uninstall.ps1 — Remove claude-code-notification
+﻿# uninstall.ps1 — Remove claude-code-notification
 
 $ErrorActionPreference = 'Stop'
 $HooksDir     = "$env:USERPROFILE\.claude\hooks"
 $SettingsPath = "$env:USERPROFILE\.claude\settings.json"
 $HookCmd      = '& "$env:USERPROFILE\.claude\hooks\cc-notif.ps1"'
 
-# 1. Remove hook from settings.json
+# 1. Remove hooks from settings.json
 if (Test-Path $SettingsPath) {
     $s = Get-Content $SettingsPath -Raw | ConvertFrom-Json
-    if ($s.hooks -and $s.hooks.PSObject.Properties['Stop']) {
-        $filtered = @($s.hooks.Stop) | Where-Object {
-            $keep = $true
-            foreach ($h in @($_.hooks)) {
-                if ($h.command -eq $HookCmd) { $keep = $false; break }
+    $removed = $false
+    foreach ($evt in 'Stop', 'Notification') {
+        if ($s.hooks -and $s.hooks.PSObject.Properties[$evt]) {
+            # -like matches both v1 (bare path) and v2 (path + -HookEvent) commands.
+            $filtered = @($s.hooks.$evt) | Where-Object {
+                $keep = $true
+                foreach ($h in @($_.hooks)) {
+                    if ($h.command -like "$HookCmd*") { $keep = $false; break }
+                }
+                $keep
             }
-            $keep
-        }
-        if ($filtered.Count -eq 0) {
-            $s.hooks.PSObject.Properties.Remove('Stop')
+            if ($filtered.Count -eq 0) {
+                $s.hooks.PSObject.Properties.Remove($evt)
+            } else {
+                $s.hooks.$evt = @($filtered)
+            }
+            $removed = $true
+            Write-Host "[OK] $evt hook removed from settings.json" -ForegroundColor Green
         } else {
-            $s.hooks.Stop = @($filtered)
+            Write-Host "[--] No $evt hook found in settings.json" -ForegroundColor Cyan
         }
+    }
+    if ($removed) {
         $s | ConvertTo-Json -Depth 10 | Set-Content $SettingsPath -Encoding utf8
-        Write-Host "[OK] Hook removed from settings.json" -ForegroundColor Green
-    } else {
-        Write-Host "[--] No Stop hook found in settings.json" -ForegroundColor Cyan
     }
 } else {
     Write-Host "[--] settings.json not found" -ForegroundColor Cyan

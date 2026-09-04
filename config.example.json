@@ -1,7 +1,9 @@
 {
   "title": "Claude Code",
   "message": "Session '{0}' done!",
+  "askMessage": "Session '{0}' needs your input",
   "sound": "",
+  "askSound": "",
   "soundDuration": 3,
   "locale": "en"
 }

@@ -1,4 +1,4 @@
-# install.ps1 — One-command setup for claude-code-notification
+﻿# install.ps1 — One-command setup for claude-code-notification
 
 $ErrorActionPreference = 'Stop'
 $HooksDir     = "$env:USERPROFILE\.claude\hooks"
@@ -30,7 +30,9 @@ if ((Test-Path $OldConfig) -and !(Test-Path $NewConfig)) {
         $migrated = @{
             title         = & $extract 'NotifTitle'   'Claude Code'
             message       = & $extract 'NotifMessage' "Session '{0}' done!"
+            askMessage    = "Session '{0}' needs your input"
             sound         = & $extract 'SoundPath'    ''
+            askSound      = ''
             soundDuration = & $extractNum 'SoundDuration' 3
             locale        = 'en'
         }
@@ -49,7 +51,7 @@ if ((Test-Path $OldConfig) -and !(Test-Path $NewConfig)) {
     Write-Host "[--] Config exists, skipping: $NewConfig" -ForegroundColor Cyan
 }
 
-# 4. Patch settings.json — APPEND to existing Stop hooks, don't overwrite
+# 4. Patch settings.json — APPEND to existing hooks, don't overwrite
 if (Test-Path $SettingsPath) {
     $s = Get-Content $SettingsPath -Raw | ConvertFrom-Json
 } else {
@@ -60,33 +62,37 @@ if (!$s.PSObject.Properties['hooks']) {
     $s | Add-Member -NotePropertyName hooks -NotePropertyValue ([PSCustomObject]@{})
 }
 
-$newHookEntry = [PSCustomObject]@{
-    type    = "command"
-    command = $HookCmd
-    shell   = "powershell"
-    async   = $true
-}
-$newHookGroup = [PSCustomObject]@{ hooks = @($newHookEntry) }
+foreach ($evt in 'Stop', 'Notification') {
+    $cmd = "$HookCmd -HookEvent $evt"
+    $newHookGroup = [PSCustomObject]@{
+        hooks = @([PSCustomObject]@{
+            type    = "command"
+            command = $cmd
+            shell   = "powershell"
+            async   = $true
+        })
+    }
 
-if ($s.hooks.PSObject.Properties['Stop']) {
-    $existing = @($s.hooks.Stop)
-    # Check if our hook is already registered
-    $alreadyInstalled = $false
-    foreach ($group in $existing) {
-        foreach ($h in @($group.hooks)) {
-            if ($h.command -eq $HookCmd) { $alreadyInstalled = $true; break }
+    if ($s.hooks.PSObject.Properties[$evt]) {
+        $existing = @($s.hooks.$evt)
+        # Match on the bare script path so a v1 Stop hook (no -HookEvent) is seen as installed too.
+        $alreadyInstalled = $false
+        foreach ($group in $existing) {
+            foreach ($h in @($group.hooks)) {
+                if ($h.command -like "$HookCmd*") { $alreadyInstalled = $true; break }
+            }
+            if ($alreadyInstalled) { break }
         }
-        if ($alreadyInstalled) { break }
-    }
-    if (!$alreadyInstalled) {
-        $s.hooks.Stop = @($existing) + @($newHookGroup)
-        Write-Host "[OK] Hook appended to existing Stop hooks." -ForegroundColor Green
+        if (!$alreadyInstalled) {
+            $s.hooks.$evt = @($existing) + @($newHookGroup)
+            Write-Host "[OK] Hook appended to existing $evt hooks." -ForegroundColor Green
+        } else {
+            Write-Host "[--] Hook already registered in $evt hooks." -ForegroundColor Cyan
+        }
     } else {
-        Write-Host "[--] Hook already registered in Stop hooks." -ForegroundColor Cyan
+        $s.hooks | Add-Member -NotePropertyName $evt -NotePropertyValue @($newHookGroup)
+        Write-Host "[OK] $evt hook registered." -ForegroundColor Green
     }
-} else {
-    $s.hooks | Add-Member -NotePropertyName Stop -NotePropertyValue @($newHookGroup)
-    Write-Host "[OK] Stop hook registered." -ForegroundColor Green
 }
 
 $s | ConvertTo-Json -Depth 10 | Set-Content $SettingsPath -Encoding utf8
